@@ -11,6 +11,7 @@ import { TokenLogin } from './TokenLogin';
 import { OrDivider } from '../OrDivider';
 import { getLoginPath, getRegisterPath, withSearchParam } from '../../pathUtils';
 import { usePathWithOrigin } from '../../../hooks/usePathWithOrigin';
+import { useSSORedirectUrl } from '../../../hooks/useSSORedirectUrl';
 import { LoginPathSearchParams } from '../../paths';
 import { useClientConfig } from '../../../hooks/useClientConfig';
 
@@ -40,7 +41,7 @@ export function Login() {
   const { loginFlows } = useAuthFlows();
   const [searchParams] = useSearchParams();
   const loginSearchParams = useLoginSearchParams(searchParams);
-  const ssoRedirectUrl = usePathWithOrigin(getLoginPath(server));
+  const ssoRedirectUrl = useSSORedirectUrl(getLoginPath(server));
   const loginTokenForHashRouter = getLoginTokenSearchParam();
   const absoluteLoginPath = usePathWithOrigin(getLoginPath(server));
 

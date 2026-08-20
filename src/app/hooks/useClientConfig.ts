@@ -18,6 +18,14 @@ export type ClientConfig = {
   };
 
   hashRouter?: HashRouterConfig;
+
+  /**
+   * (Cytale) When set, SSO login redirects back to this custom scheme
+   * (e.g. "cytale://callback") instead of the WebView origin
+   * (capacitor://localhost). Only used for the SSO/OIDC redirectUrl; all
+   * other origin-derived links keep the WebView origin.
+   */
+  ssoRedirectScheme?: string;
 };
 
 const ClientConfigContext = createContext<ClientConfig | null>(null);

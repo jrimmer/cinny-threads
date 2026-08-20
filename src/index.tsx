@@ -17,6 +17,7 @@ import App from './app/pages/App';
 import './app/i18n';
 import { pushSessionToSW } from './sw-session';
 import { getFallbackSession } from './app/state/sessions';
+import { initSSODeeplink } from './sso-deeplink';
 
 document.body.classList.add(configClass, varsClass);
 
@@ -45,6 +46,11 @@ if ('serviceWorker' in navigator) {
 }
 
 const mountApp = () => {
+  // Register the SSO deep-link handler before rendering so a cold-start via
+  // cytale://callback is caught. Safe on every platform; no-ops without the
+  // Capacitor App bridge.
+  initSSODeeplink();
+
   const rootContainer = document.getElementById('root');
 
   if (rootContainer === null) {

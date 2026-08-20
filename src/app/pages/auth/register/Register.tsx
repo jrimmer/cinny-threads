@@ -10,7 +10,7 @@ import { OrDivider } from '../OrDivider';
 import { SSOLogin } from '../SSOLogin';
 import { SupportedUIAFlowsLoader } from '../../../components/SupportedUIAFlowsLoader';
 import { getLoginPath } from '../../pathUtils';
-import { usePathWithOrigin } from '../../../hooks/usePathWithOrigin';
+import { useSSORedirectUrl } from '../../../hooks/useSSORedirectUrl';
 import { RegisterPathSearchParams } from '../../paths';
 
 const useRegisterSearchParams = (searchParams: URLSearchParams): RegisterPathSearchParams =>
@@ -31,7 +31,7 @@ export function Register() {
   const { sso } = useParsedLoginFlows(loginFlows.flows);
 
   // redirect to /login because only that path handle m.login.token
-  const ssoRedirectUrl = usePathWithOrigin(getLoginPath(server));
+  const ssoRedirectUrl = useSSORedirectUrl(getLoginPath(server));
 
   return (
     <Box direction="Column" gap="500">
