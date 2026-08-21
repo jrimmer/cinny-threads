@@ -1,20 +1,23 @@
 /**
- * Cytale system-browser SSO bridge.
+ * Cytale SSO launch bridge.
  *
- * Instead of launching homeserver SSO/OIDC inside the Capacitor WKWebView
- * (whose `allowNavigation` host allowlist cannot cover arbitrary user-picked
- * homeservers, and which cannot reliably follow a 303 redirect to the
- * `cytale://` custom scheme), SSO runs in the SYSTEM browser. This works for
- * ANY homeserver/IdP the user selects: the browser is a standalone OS surface,
- * and on completion the homeserver redirects to `cytale://callback?...`, iOS
- * routes that custom scheme back to our app, and `@capacitor/app` fires
- * `appUrlOpen` with the token.
+ * Tries, in order:
+ *  1. Native `CytaleSSO` (ASWebAuthenticationSession) — preferred. Returns the
+ *     final `cytale://callback?...loginToken` URL directly and hands it through
+ *     the same `buildLoginUrl` rewrite used by the `appUrlOpen` deep-link path,
+ *     so Cinny TokenLogin completes fully in-app. no OS-level deep-link
+ *     re-delivery race, no "Open in Cytale?" prompt.
+ *  2. `@capacitor/browser` (SFSafariViewController in-app sheet) — previous
+ *     fallback; callback still arrives via `appUrlOpen` (less reliable).
+ *  3. Plain top-level navigation (`window.location.href`) when no native bridge
+ *     exists (plain web / tooling-hot path).
  *
- * Accessing the Capacitor plugins here mirrors how the SSO deep-link runtime
- * does it (global `Capacitor.Plugins.*`) so this file has no native/module
- * dependency and degrades to a normal `<a>` navigation when the bridge is
- * absent (e.g. plain web).
+ * Accessing the Capacitor plugins mirrors how the SSO deep-link runtime does it
+ * (global `Capacitor.Plugins.*`) so this file has no native/module dependency.
  */
+
+import { buildLoginUrl } from './sso-deeplink';
+import { startCytaleNativeSSO, hasCytaleNativeSSO } from './cytale-sso';
 
 type BrowserPluginLike = {
   open?: (opts: { url: string }) => Promise<unknown>;
@@ -34,21 +37,40 @@ function getBrowserPlugin(): BrowserPluginLike | null {
   }
 }
 
-/** Whether the Capacitor Browser (system browser) bridge is available. */
+/** Whether a preferable SSO bridge (native-first, then Browser) is available. */
 export function hasSystemBrowser(): boolean {
-  return getBrowserPlugin()?.open != null;
+  return hasCytaleNativeSSO() || getBrowserPlugin()?.open != null;
+}
+
+/** After a callback URL is produced, route it into Cinny's login route. */
+function routeLoginToken(callbackUrl: string): void {
+  const target = buildLoginUrl(callbackUrl);
+  if (target && typeof window !== 'undefined') {
+    window.location.replace(target);
+  }
 }
 
 /**
- * Open an SSO login URL in the system browser.
+ * Open an SSO login URL for the user.
  *
- * Returns a promise that settles when the native open request is issued (not
- * when the user finishes), so a click handler can await it without changing
- * the SPA URL — the callback comes back through `appUrlOpen`, not a navigation.
- *
- * Falls back to a normal top-level navigation when the bridge is unavailable.
+ * Prefers the native ASWebAuthenticationSession bridge: it awaits the user's
+ * completion and routes the returned callback directly through TokenLogin. When
+ * the native bridge is absent it falls back to @capacitor/browser, and finally
+ * to a normal top-level navigation.
  */
 export async function openSSOInSystemBrowser(url: string): Promise<void> {
+  // 1) Native ASWebAuthenticationSession path (returns the callback URL).
+  if (hasCytaleNativeSSO()) {
+    const callbackUrl = await startCytaleNativeSSO(url);
+    if (callbackUrl) {
+      routeLoginToken(callbackUrl);
+      return;
+    }
+    // Cancelled/error: stay on the login page rather than navigating away.
+    return;
+  }
+
+  // 2) @capacitor/browser in-app SFSafariViewController (callback via appUrlOpen).
   const browser = getBrowserPlugin();
   if (browser?.open) {
     try {
@@ -58,7 +80,8 @@ export async function openSSOInSystemBrowser(url: string): Promise<void> {
       // Fall through to a regular navigation if the plugin call throws.
     }
   }
-  // No Capacitor bridge (plain web): let the link navigate normally.
+
+  // 3) Plain web: let the link navigate normally.
   if (typeof window !== 'undefined') {
     window.location.href = url;
   }
@@ -67,7 +90,8 @@ export async function openSSOInSystemBrowser(url: string): Promise<void> {
 /**
  * Request the system browser be closed. Called when the `appUrlOpen` callback
  * fires (the homeserver redirected to cytale://callback and the OS brought our
- * app forward), so the browser sheet dismisses and the SPA ends up foreground.
+ * app forward), so a browser sheet dismisses. No-op for the native
+ * ASWebAuthenticationSession path (it auto-dismisses on callback).
  */
 export function closeSystemBrowser(): void {
   const browser = getBrowserPlugin();

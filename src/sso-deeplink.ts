@@ -36,8 +36,14 @@ function getAppPlugin(): AppPluginLike | null {
   return (app as AppPluginLike | undefined) ?? null;
 }
 
-/** Build the in-app Cinny login URL from a cytale://callback deep link. */
-function buildLoginUrl(rawUrl: string): string | null {
+/**
+ * Build the in-app Cinny login URL from a `cytale://callback` deep link.
+ *
+ * Exported so both the passive `appUrlOpen` runtime and the active native SSO
+ * path (cytale-sso / system-browser-sso) can route a completed callback URL
+ * into Cinny's TokenLogin identically.
+ */
+export function buildLoginUrl(rawUrl: string): string | null {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
