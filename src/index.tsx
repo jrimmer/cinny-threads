@@ -48,8 +48,13 @@ if ('serviceWorker' in navigator) {
 const mountApp = () => {
   // Register the SSO deep-link handler before rendering so a cold-start via
   // cytale://callback is caught. Safe on every platform; no-ops without the
-  // Capacitor App bridge.
-  initSSODeeplink();
+  // Capacitor App bridge. The try/catch is a defensive guarantee: no deep-link
+  // setup error may ever abort the app mount and cause a blank white screen.
+  try {
+    initSSODeeplink();
+  } catch (err) {
+    console.error('SSO deep-link init failed (non-fatal):', err);
+  }
 
   const rootContainer = document.getElementById('root');
 

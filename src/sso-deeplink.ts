@@ -77,31 +77,46 @@ function trimLeadingSlash(s: string): string {
 
 let resolvedOne = false;
 
+/**
+ * Register the deep-link callback handler. This runs at SPA startup, so it
+ * must NEVER throw: an uncaught error on any code path would abort Cinny's
+ * mount and leave a blank white screen. Every action is wrapped in try/catch
+ * and degrades to a no-op when the Capacitor App bridge is absent.
+ */
 export function initSSODeeplink(): void {
   if (resolvedOne) return;
   resolvedOne = true;
 
-  const appPlugin = getAppPlugin();
-  if (appPlugin?.addListener) {
-    appPlugin
-      .addListener('appUrlOpen', (payload) => {
-        const target = buildLoginUrl(payload.url);
-        if (target) {
-          // Redirect the SPA to its own login route carrying the token. Use
-          // replace so the deep link does not pollute the history stack.
-          window.location.replace(target);
-        }
-      })
-      .catch(() => {
-        // Capacitor bridge unavailable at load; fall back to a one-shot poll
-        // of the current URL in case the app was launched via the scheme.
-      });
-  }
+  try {
+    const appPlugin = getAppPlugin();
+    if (appPlugin?.addListener) {
+      appPlugin
+        .addListener('appUrlOpen', (payload) => {
+          try {
+            const target = buildLoginUrl(payload.url);
+            if (target) {
+              // Redirect the SPA to its own login route carrying the token. Use
+              // replace so the deep link does not pollute the history stack.
+              window.location.replace(target);
+            }
+          } catch {
+            // Never let a malformed deep link break the running app.
+          }
+        })
+        .catch(() => {
+          // Capacitor bridge unavailable at load; fall back to the cold-start
+          // check below (launch via the scheme is handled there).
+        });
+    }
 
-  // Cold-start fallback: if the app was launched by the scheme, the callback
-  // URL may already be present (Capacitor rehydrates `window.location`).
-  const target = buildLoginUrl(window.location.href);
-  if (target && window.location.protocol !== 'cytale:') {
-    window.location.replace(target);
+    // Cold-start fallback: if the app was launched by the scheme, the callback
+    // URL may already be present (Capacitor rehydrates `window.location`).
+    const target = buildLoginUrl(window.location.href);
+    if (target && window.location.protocol !== 'cytale:') {
+      window.location.replace(target);
+    }
+  } catch {
+    // Outer safety net: an unexpected throw here must never white-screen the
+    // app. SSO deep-link handling is best-effort only.
   }
 }
