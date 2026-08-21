@@ -2,6 +2,7 @@ import { Avatar, AvatarImage, Box, Button, Text } from 'folds';
 import { IIdentityProvider, SSOAction, createClient } from 'matrix-js-sdk';
 import React, { useMemo } from 'react';
 import { useAutoDiscoveryInfo } from '../../hooks/useAutoDiscoveryInfo';
+import { openSSOInSystemBrowser } from '../../../system-browser-sso';
 
 type SSOLoginProps = {
   providers?: IIdentityProvider[];
@@ -25,6 +26,19 @@ export function SSOLogin({ providers, redirectUrl, action, saveScreenSpace }: SS
 
   const renderAsIcons = withoutIcon ? false : saveScreenSpace && providers && providers.length > 2;
 
+  // Open SSO/OIDC in the system browser (Capacitor Browser) when available so
+  // the flow works for ANY user-chosen homeserver/IdP, and the final
+  // cytale://callback is handed back to the app reliably. Without the bridge
+  // (plain web) we fall back to the normal link navigation.
+  //
+  // We keep the plain href on the link (semantics/deeplink fallback) and only
+  // intercept the click; `openSSOInSystemBrowser` itself falls back to
+  // `window.location.href` when the bridge is absent.
+  const onSSOClick = (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
+    e.preventDefault();
+    void openSSOInSystemBrowser(url);
+  };
+
   return (
     <Box justifyContent="Center" gap="600" wrap="Wrap">
       {providers ? (
@@ -41,6 +55,7 @@ export function SSOLogin({ providers, redirectUrl, action, saveScreenSpace }: SS
                 key={id}
                 as="a"
                 href={getSSOIdUrl(id)}
+                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => onSSOClick(e, getSSOIdUrl(id))}
                 aria-label={buttonTitle}
                 size="300"
                 radii="300"
@@ -56,6 +71,7 @@ export function SSOLogin({ providers, redirectUrl, action, saveScreenSpace }: SS
               key={id}
               as="a"
               href={getSSOIdUrl(id)}
+              onClick={(e: React.MouseEvent<HTMLAnchorElement>) => onSSOClick(e, getSSOIdUrl(id))}
               size="500"
               variant="Secondary"
               fill="Soft"
@@ -79,6 +95,7 @@ export function SSOLogin({ providers, redirectUrl, action, saveScreenSpace }: SS
           style={{ width: '100%' }}
           as="a"
           href={getSSOIdUrl()}
+          onClick={(e: React.MouseEvent<HTMLAnchorElement>) => onSSOClick(e, getSSOIdUrl())}
           size="500"
           variant="Secondary"
           fill="Soft"

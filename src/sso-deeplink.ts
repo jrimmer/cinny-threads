@@ -1,5 +1,6 @@
 import { trimSlash, trimTrailingSlash } from './app/utils/common';
 import { getLoginPath } from './app/pages/pathUtils';
+import { closeSystemBrowser } from './system-browser-sso';
 
 /**
  * Cytale SSO deep-link handler.
@@ -93,6 +94,12 @@ export function initSSODeeplink(): void {
       appPlugin
         .addListener('appUrlOpen', (payload) => {
           try {
+            // An SSO completion (cytale://callback?...loginToken) usually means
+            // the system browser was on screen; dismiss it now that iOS has
+            // routed us back via the custom scheme. Best-effort, never throws.
+            if (payload.url.startsWith('cytale://')) {
+              closeSystemBrowser();
+            }
             const target = buildLoginUrl(payload.url);
             if (target) {
               // Redirect the SPA to its own login route carrying the token. Use
