@@ -449,7 +449,6 @@ export function RoomTimeline({ room, eventId, roomInputRef, editor }: RoomTimeli
   const showUrlPreview = room.hasEncryptionStateEvent() ? encUrlPreview : urlPreview;
   const [showHiddenEvents] = useSetting(settingsAtom, 'showHiddenEvents');
   const [showDeveloperTools] = useSetting(settingsAtom, 'developerTools');
-  const [threadsDrawer] = useSetting(settingsAtom, 'threadsDrawer');
 
   const [hour24Clock] = useSetting(settingsAtom, 'hour24Clock');
   const [dateFormatString] = useSetting(settingsAtom, 'dateFormatString');
@@ -1177,7 +1176,7 @@ export function RoomTimeline({ room, eventId, roomInputRef, editor }: RoomTimeli
                 />
               )}
             </Message>
-            {threadRoot && threadsDrawer && (
+            {threadRoot && (
               <ThreadSummary
                 room={room}
                 thread={threadRoot}
@@ -1192,119 +1191,132 @@ export function RoomTimeline({ room, eventId, roomInputRef, editor }: RoomTimeli
         const reactions = reactionRelations && reactionRelations.getSortedAnnotationsByKey();
         const hasReactions = reactions && reactions.length > 0;
         const { replyEventId, threadRootId } = mEvent;
+        // A message is a thread root if it has a matching Thread object in the room.
+        const threadRoot = room.getThread(mEventId);
         const highlighted = focusItem?.index === item && focusItem.highlight;
 
         return (
-          <Message
-            key={mEvent.getId()}
-            data-message-item={item}
-            data-message-id={mEventId}
-            room={room}
-            mEvent={mEvent}
-            messageSpacing={messageSpacing}
-            messageLayout={messageLayout}
-            collapse={collapse}
-            highlight={highlighted}
-            edit={editId === mEventId}
-            canDelete={canRedact || (canDeleteOwn && mEvent.getSender() === mx.getUserId())}
-            canSendReaction={canSendReaction}
-            canPinEvent={canPinEvent}
-            imagePackRooms={imagePackRooms}
-            relations={hasReactions ? reactionRelations : undefined}
-            onUserClick={handleUserClick}
-            onUsernameClick={handleUsernameClick}
-            onReplyClick={handleReplyClick}
-            onReactionToggle={handleReactionToggle}
-            onEditId={handleEdit}
-            reply={
-              replyEventId && (
-                <Reply
-                  room={room}
-                  timelineSet={timelineSet}
-                  replyEventId={replyEventId}
-                  threadRootId={threadRootId}
-                  onClick={handleOpenReply}
-                  getMemberPowerTag={getMemberPowerTag}
-                  accessibleTagColors={accessiblePowerTagColors}
-                  legacyUsernameColor={legacyUsernameColor || direct}
-                />
-              )
-            }
-            reactions={
-              reactionRelations && (
-                <Reactions
-                  style={{ marginTop: config.space.S200 }}
-                  room={room}
-                  relations={reactionRelations}
-                  mEventId={mEventId}
-                  canSendReaction={canSendReaction}
-                  onReactionToggle={handleReactionToggle}
-                />
-              )
-            }
-            hideReadReceipts={hideActivity}
-            showDeveloperTools={showDeveloperTools}
-            memberPowerTag={getMemberPowerTag(mEvent.getSender() ?? '')}
-            accessibleTagColors={accessiblePowerTagColors}
-            legacyUsernameColor={legacyUsernameColor || direct}
-            hour24Clock={hour24Clock}
-            dateFormatString={dateFormatString}
-          >
-            <EncryptedContent mEvent={mEvent}>
-              {() => {
-                if (mEvent.isRedacted()) return <RedactedContent />;
-                if (mEvent.getType() === MessageEvent.Sticker)
-                  return (
-                    <MSticker
-                      content={mEvent.getContent()}
-                      renderImageContent={(props) => (
-                        <ImageContent
-                          {...props}
-                          autoPlay={mediaAutoLoad}
-                          renderImage={(p) => <Image {...p} loading="lazy" />}
-                          renderViewer={(p) => <ImageViewer {...p} />}
-                        />
-                      )}
-                    />
-                  );
-                if (mEvent.getType() === MessageEvent.RoomMessage) {
-                  const editedEvent = getEditedEvent(mEventId, mEvent, timelineSet);
-                  const getContent = (() =>
-                    editedEvent?.getContent()['m.new_content'] ??
-                    mEvent.getContent()) as GetContentCallback;
+          <React.Fragment key={mEvent.getId()}>
+            <Message
+              key={mEvent.getId()}
+              data-message-item={item}
+              data-message-id={mEventId}
+              room={room}
+              mEvent={mEvent}
+              messageSpacing={messageSpacing}
+              messageLayout={messageLayout}
+              collapse={collapse}
+              highlight={highlighted}
+              edit={editId === mEventId}
+              canDelete={canRedact || (canDeleteOwn && mEvent.getSender() === mx.getUserId())}
+              canSendReaction={canSendReaction}
+              canPinEvent={canPinEvent}
+              imagePackRooms={imagePackRooms}
+              relations={hasReactions ? reactionRelations : undefined}
+              onUserClick={handleUserClick}
+              onUsernameClick={handleUsernameClick}
+              onReplyClick={handleReplyClick}
+              onReactionToggle={handleReactionToggle}
+              onEditId={handleEdit}
+              reply={
+                replyEventId && (
+                  <Reply
+                    room={room}
+                    timelineSet={timelineSet}
+                    replyEventId={replyEventId}
+                    threadRootId={threadRootId}
+                    onClick={handleOpenReply}
+                    getMemberPowerTag={getMemberPowerTag}
+                    accessibleTagColors={accessiblePowerTagColors}
+                    legacyUsernameColor={legacyUsernameColor || direct}
+                  />
+                )
+              }
+              reactions={
+                reactionRelations && (
+                  <Reactions
+                    style={{ marginTop: config.space.S200 }}
+                    room={room}
+                    relations={reactionRelations}
+                    mEventId={mEventId}
+                    canSendReaction={canSendReaction}
+                    onReactionToggle={handleReactionToggle}
+                  />
+                )
+              }
+              hideReadReceipts={hideActivity}
+              showDeveloperTools={showDeveloperTools}
+              memberPowerTag={getMemberPowerTag(mEvent.getSender() ?? '')}
+              accessibleTagColors={accessiblePowerTagColors}
+              legacyUsernameColor={legacyUsernameColor || direct}
+              hour24Clock={hour24Clock}
+              dateFormatString={dateFormatString}
+            >
+              <EncryptedContent mEvent={mEvent}>
+                {() => {
+                  if (mEvent.isRedacted()) return <RedactedContent />;
+                  if (mEvent.getType() === MessageEvent.Sticker)
+                    return (
+                      <MSticker
+                        content={mEvent.getContent()}
+                        renderImageContent={(props) => (
+                          <ImageContent
+                            {...props}
+                            autoPlay={mediaAutoLoad}
+                            renderImage={(p) => <Image {...p} loading="lazy" />}
+                            renderViewer={(p) => <ImageViewer {...p} />}
+                          />
+                        )}
+                      />
+                    );
+                  if (mEvent.getType() === MessageEvent.RoomMessage) {
+                    const editedEvent = getEditedEvent(mEventId, mEvent, timelineSet);
+                    const getContent = (() =>
+                      editedEvent?.getContent()['m.new_content'] ??
+                      mEvent.getContent()) as GetContentCallback;
 
-                  const senderId = mEvent.getSender() ?? '';
-                  const senderDisplayName =
-                    getMemberDisplayName(room, senderId) ?? getMxIdLocalPart(senderId) ?? senderId;
-                  return (
-                    <RenderMessageContent
-                      displayName={senderDisplayName}
-                      msgType={mEvent.getContent().msgtype ?? ''}
-                      ts={mEvent.getTs()}
-                      edited={!!editedEvent}
-                      getContent={getContent}
-                      mediaAutoLoad={mediaAutoLoad}
-                      urlPreview={showUrlPreview}
-                      htmlReactParserOptions={htmlReactParserOptions}
-                      linkifyOpts={linkifyOpts}
-                      outlineAttachment={messageLayout === MessageLayout.Bubble}
-                    />
-                  );
-                }
-                if (mEvent.getType() === MessageEvent.RoomMessageEncrypted)
+                    const senderId = mEvent.getSender() ?? '';
+                    const senderDisplayName =
+                      getMemberDisplayName(room, senderId) ??
+                      getMxIdLocalPart(senderId) ??
+                      senderId;
+                    return (
+                      <RenderMessageContent
+                        displayName={senderDisplayName}
+                        msgType={mEvent.getContent().msgtype ?? ''}
+                        ts={mEvent.getTs()}
+                        edited={!!editedEvent}
+                        getContent={getContent}
+                        mediaAutoLoad={mediaAutoLoad}
+                        urlPreview={showUrlPreview}
+                        htmlReactParserOptions={htmlReactParserOptions}
+                        linkifyOpts={linkifyOpts}
+                        outlineAttachment={messageLayout === MessageLayout.Bubble}
+                      />
+                    );
+                  }
+                  if (mEvent.getType() === MessageEvent.RoomMessageEncrypted)
+                    return (
+                      <Text>
+                        <MessageNotDecryptedContent />
+                      </Text>
+                    );
                   return (
                     <Text>
-                      <MessageNotDecryptedContent />
+                      <MessageUnsupportedContent />
                     </Text>
                   );
-                return (
-                  <Text>
-                    <MessageUnsupportedContent />
-                  </Text>
-                );
-              }}
-            </EncryptedContent>
-          </Message>
+                }}
+              </EncryptedContent>
+            </Message>
+            {threadRoot && (
+              <ThreadSummary
+                room={room}
+                thread={threadRoot}
+                onOpen={() => handleOpenThread(threadRoot.id)}
+              />
+            )}
+          </React.Fragment>
         );
       },
       [MessageEvent.Sticker]: (mEventId, mEvent, item, timelineSet, collapse) => {
