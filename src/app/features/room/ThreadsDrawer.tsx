@@ -1,11 +1,4 @@
-import React, {
-  MouseEventHandler,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { MouseEventHandler, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
   Avatar,
@@ -173,12 +166,7 @@ function ThreadList({
               </Text>
             )}
             {threads.map((thread) => (
-              <ThreadListItem
-                key={thread.id}
-                room={room}
-                thread={thread}
-                onSelect={onSelect}
-              />
+              <ThreadListItem key={thread.id} room={room} thread={thread} onSelect={onSelect} />
             ))}
           </Box>
         </Scroll>
@@ -191,10 +179,12 @@ function ThreadMessages({
   room,
   thread,
   onEventsCount,
+  onLoaded,
 }: {
   room: Room;
   thread: Thread;
   onEventsCount?: (count: number) => void;
+  onLoaded?: () => void;
 }) {
   const mx = useMatrixClient();
   const [hideActivity] = useSetting(settingsAtom, 'hideActivity');
@@ -355,6 +345,17 @@ function ThreadMessages({
     onEventsCount?.(events.length);
   }, [events.length, onEventsCount]);
 
+  // Notify the parent once the backfill completes and the full content is
+  // rendered. onEventsCount only fires when events.length changes, so a thread
+  // that was already fully loaded (e.g. reopened, or loaded via sync) would
+  // never trigger a scroll otherwise; this guarantees the initial open lands on
+  // the latest message regardless of whether the count grew.
+  const prevLoadingRef = useRef(true);
+  useEffect(() => {
+    if (prevLoadingRef.current && !loading) onLoaded?.();
+    prevLoadingRef.current = loading;
+  }, [loading, onLoaded]);
+
   const onUserClick: MouseEventHandler<HTMLButtonElement> = useCallback((evt) => {
     evt.preventDefault();
     evt.stopPropagation();
@@ -391,9 +392,12 @@ function ThreadMessages({
         const senderId = mEvent.getSender() ?? '';
         const senderDisplayName = getSenderName(room, senderId);
         const eventId = mEvent.getId();
-        const editedEvent = eventId ? getEditedEvent(eventId, mEvent, thread.timelineSet) : undefined;
+        const editedEvent = eventId
+          ? getEditedEvent(eventId, mEvent, thread.timelineSet)
+          : undefined;
         const getContent = (() =>
-          editedEvent?.getContent()['m.new_content'] ?? mEvent.getContent()) as unknown as GetContentCallback;
+          editedEvent?.getContent()['m.new_content'] ??
+          mEvent.getContent()) as unknown as GetContentCallback;
         const eventType = mEvent.getType();
 
         return (
@@ -617,7 +621,8 @@ function ThreadDetail({
   // Auto-scroll the thread message view to the bottom whenever a new reply
   // arrives (the event count grows) so the viewer sees their freshly sent
   // reply and incoming replies without manual scrolling — mirroring the main
-  // timeline's scroll-to-latest behavior.
+  // timeline's scroll-to-latest behavior. Opening a thread (e.g. from the
+  // summary link under a message) also starts at the bottom (the latest reply).
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevEventCountRef = useRef<number>(-1);
   const handleEventsCount = useCallback((count: number) => {
@@ -626,6 +631,14 @@ function ThreadDetail({
       if (el) scrollToBottom(el, 'auto');
     }
     prevEventCountRef.current = count;
+  }, []);
+
+  // Jump to the latest message once the thread has finished loading. Runs in a
+  // layout effect so the scroll container has its full height measured and can
+  // land at the newest reply instead of staying at the thread's root.
+  const handleThreadLoaded = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) scrollToBottom(el, 'auto');
   }, []);
 
   const handleViewInThread = () => {
@@ -680,9 +693,20 @@ function ThreadDetail({
         </TooltipProvider>
       </Header>
       <Box className={css.ThreadDrawerContentBase} grow="Yes">
-        <Scroll ref={scrollRef} variant="Background" size="300" visibility="Always" hideTrack={false}>
+        <Scroll
+          ref={scrollRef}
+          variant="Background"
+          size="300"
+          visibility="Always"
+          hideTrack={false}
+        >
           <Box className={css.ThreadDrawerContent} direction="Column" gap="100">
-            <ThreadMessages room={room} thread={thread} onEventsCount={handleEventsCount} />
+            <ThreadMessages
+              room={room}
+              thread={thread}
+              onEventsCount={handleEventsCount}
+              onLoaded={handleThreadLoaded}
+            />
           </Box>
         </Scroll>
       </Box>
